@@ -4,85 +4,55 @@ struct GameView: View {
     @ObservedObject var model: GameModel
     @Binding var bestScore: Int
     let hapticsOn: Bool
+    let adsRemoved: Bool
     let theme: GameTheme
     let onHome: () -> Void
     let onSettings: () -> Void
+
+    private var shouldShowAds: Bool {
+        AdPlacementPolicy.shouldShowBanners(adsRemoved: adsRemoved)
+    }
 
     var body: some View {
         ZStack {
             BackgroundView(theme: theme)
 
             VStack(spacing: 0) {
-                HUDView(model: model, bestScore: bestScore, theme: theme)
+                GameTopBar(theme: theme, onHome: onHome, onSettings: onSettings)
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
 
+                HUDView(model: model, bestScore: bestScore, theme: theme)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 6)
+
                 Spacer(minLength: 8)
+
+                if shouldShowAds {
+                    AdBannerView(theme: theme, label: "Ad placement")
+                        .frame(height: 60)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                }
 
                 GameBoardView(model: model, theme: theme)
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity)
 
+                if shouldShowAds {
+                    AdBannerView(theme: theme, label: "Ad placement")
+                        .frame(height: 60)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                }
+
                 Spacer(minLength: 12)
             }
 
-            VStack {
-                HStack {
-                    Button(action: { onHome() }) {
-                        Image(systemName: "house.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Color.white.opacity(0.18))
-                            .clipShape(Circle())
-                    }
-
-                    Spacer()
-
-                    Button(action: { onSettings() }) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Color.white.opacity(0.18))
-                            .clipShape(Circle())
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-
-                Spacer()
-            }
-
-            VStack {
-                Spacer()
-                HStack(alignment: .bottom) {
-                    JoystickView(size: 120, theme: theme) { vector in
-                        model.updateInput(vector)
-                    }
-
-                    Spacer()
-
-                    Button(action: {
-                        if model.state == .playing {
-                            model.pauseGame()
-                        } else if model.state == .paused {
-                            model.resumeGame()
-                        }
-                    }) {
-                        Text(model.state == .paused ? "Resume" : "Pause")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(theme.palette.button)
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    }
-                    .disabled(model.state != .playing && model.state != .paused)
-                    .opacity(model.state == .playing || model.state == .paused ? 1 : 0.4)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 22)
+            if model.state == .playing {
+                BottomControlOverlay(model: model, theme: theme)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 22)
             }
 
             overlayView
@@ -91,15 +61,16 @@ struct GameView: View {
             if (newState == .gameOver || newState == .levelComplete), model.score > bestScore {
                 bestScore = model.score
             }
-            if hapticsOn {
-                switch newState {
-                case .levelComplete:
-                    Haptics.notify(.success)
-                case .gameOver:
-                    Haptics.notify(.error)
-                default:
-                    break
-                }
+
+            guard hapticsOn else { return }
+
+            switch newState {
+            case .levelComplete:
+                Haptics.notify(.success)
+            case .gameOver:
+                Haptics.notify(.error)
+            default:
+                break
             }
         }
         .onChange(of: model.foodEaten) { newValue in
@@ -117,9 +88,9 @@ struct GameView: View {
                 title: "Level \(model.level.index) Complete",
                 subtitle: "New level generated. Faster speed and more obstacles.",
                 primaryTitle: "Next Level",
-                primaryAction: { model.nextLevel() },
+                primaryAction: model.nextLevel,
                 secondaryTitle: "Home",
-                secondaryAction: { onHome() },
+                secondaryAction: onHome,
                 theme: theme
             )
         case .gameOver:
@@ -127,9 +98,9 @@ struct GameView: View {
                 title: "Game Over",
                 subtitle: "Score \(model.score). You can do better.",
                 primaryTitle: "Restart",
-                primaryAction: { model.startNewGame() },
+                primaryAction: model.startNewGame,
                 secondaryTitle: "Home",
-                secondaryAction: { onHome() },
+                secondaryAction: onHome,
                 theme: theme
             )
         case .paused:
@@ -137,13 +108,92 @@ struct GameView: View {
                 title: "Paused",
                 subtitle: "Tap resume or adjust settings.",
                 primaryTitle: "Resume",
-                primaryAction: { model.resumeGame() },
+                primaryAction: model.resumeGame,
                 secondaryTitle: "Settings",
-                secondaryAction: { onSettings() },
+                secondaryAction: onSettings,
                 theme: theme
             )
         default:
             EmptyView()
+        }
+    }
+}
+
+private struct GameTopBar: View {
+    let theme: GameTheme
+    let onHome: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        HStack {
+            CircularIconButton(systemName: "house.fill", action: onHome)
+            Spacer()
+            CircularIconButton(systemName: "slider.horizontal.3", action: onSettings)
+        }
+    }
+}
+
+private struct CircularIconButton: View {
+    let systemName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(Color.white.opacity(0.18))
+                .clipShape(Circle())
+        }
+    }
+}
+
+private struct BottomControlOverlay: View {
+    @ObservedObject var model: GameModel
+    let theme: GameTheme
+
+    var body: some View {
+        VStack {
+            Spacer()
+
+            ZStack(alignment: .bottom) {
+                JoystickView(size: 120, theme: theme) { vector in
+                    model.updateInput(vector)
+                }
+
+                HStack {
+                    Spacer()
+                    PauseButton(model: model, theme: theme)
+                }
+            }
+        }
+    }
+}
+
+private struct PauseButton: View {
+    @ObservedObject var model: GameModel
+    let theme: GameTheme
+
+    var body: some View {
+        Button(action: togglePause) {
+            Text(model.state == .paused ? "Resume" : "Pause")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(theme.palette.button)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
+        }
+        .disabled(model.state != .playing && model.state != .paused)
+        .opacity(model.state == .playing || model.state == .paused ? 1 : 0.4)
+    }
+
+    private func togglePause() {
+        if model.state == .playing {
+            model.pauseGame()
+        } else if model.state == .paused {
+            model.resumeGame()
         }
     }
 }
@@ -159,6 +209,7 @@ private struct HUDView: View {
                 Text("Level \(model.level.index)")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(theme.palette.hudText)
+
                 Text("Goal: \(model.foodEaten)/\(model.level.targetFood)")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(theme.palette.hudSubtle)
@@ -170,6 +221,7 @@ private struct HUDView: View {
                 Text("Score \(model.score)")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(theme.palette.hudText)
+
                 Text("Best \(bestScore)")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(theme.palette.hudSubtle)
@@ -192,6 +244,7 @@ private struct OverlayCard: View {
             Text(title)
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+
             Text(subtitle)
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.white.opacity(0.8))

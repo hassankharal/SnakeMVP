@@ -8,52 +8,90 @@ struct Obstacle: Identifiable {
 }
 
 enum LevelGenerator {
+    private enum Constants {
+        static let baseWorldSize: CGFloat = 900
+        static let maxWorldSize: CGFloat = 1200
+        static let worldGrowthPerLevel: CGFloat = 30
+
+        static let baseSpeed: CGFloat = 140
+        static let maxSpeed: CGFloat = 300
+        static let speedGrowthPerLevel: CGFloat = 10
+
+        static let baseTargetFood = 5
+        static let targetFoodGrowthPerLevel = 2
+
+        static let baseObstacleCount = 4
+        static let obstacleGrowthPerLevel = 2
+        static let maxObstacleCount = 30
+
+        static let obstacleRadius: CGFloat = 18
+        static let obstaclePadding: CGFloat = 18
+        static let maxPlacementAttempts = 2000
+        static let obstacleSpacingMultiplier: CGFloat = 2.4
+    }
+
     static func generate(after previous: Level?) -> Level {
         let index = (previous?.index ?? 0) + 1
 
-        let baseWorld: CGFloat = 900
-        let world = min(1200, baseWorld + CGFloat(index - 1) * 30)
+        let worldSize = min(
+            Constants.maxWorldSize,
+            Constants.baseWorldSize + CGFloat(index - 1) * Constants.worldGrowthPerLevel
+        )
 
-        let baseSpeed: CGFloat = 140
-        let speed = min(300, baseSpeed + CGFloat(index - 1) * 10)
+        let speed = min(
+            Constants.maxSpeed,
+            Constants.baseSpeed + CGFloat(index - 1) * Constants.speedGrowthPerLevel
+        )
 
-        let targetFood = 5 + (index * 2)
-        let obstacleCount = min(30, 4 + (index * 2))
+        let targetFood = Constants.baseTargetFood + (index * Constants.targetFoodGrowthPerLevel)
+        let obstacleCount = min(
+            Constants.maxObstacleCount,
+            Constants.baseObstacleCount + (index * Constants.obstacleGrowthPerLevel)
+        )
 
         return Level(
             index: index,
-            worldSize: world,
+            worldSize: worldSize,
             targetFood: targetFood,
             speed: speed,
             obstacleCount: obstacleCount
         )
     }
 
-    static func generateObstacles(level: Level, blocked: [CGPoint], snakeRadius: CGFloat) -> [Obstacle] {
+    static func generateObstacles(
+        level: Level,
+        blocked: [CGPoint],
+        snakeRadius: CGFloat,
+        randomSource: RandomSource
+    ) -> [Obstacle] {
         guard level.obstacleCount > 0 else { return [] }
 
         var obstacles: [Obstacle] = []
-        let world = level.worldSize
-        let radius: CGFloat = 18
-        let padding = snakeRadius + radius + 18
+        let worldSize = level.worldSize
+        let obstacleRadius = Constants.obstacleRadius
+        let spawnPadding = snakeRadius + obstacleRadius + Constants.obstaclePadding
 
         var attempts = 0
-        while obstacles.count < level.obstacleCount && attempts < 2000 {
+        while obstacles.count < level.obstacleCount && attempts < Constants.maxPlacementAttempts {
             attempts += 1
-            let point = CGPoint(
-                x: CGFloat.random(in: padding..<(world - padding)),
-                y: CGFloat.random(in: padding..<(world - padding))
+
+            let candidate = CGPoint(
+                x: randomSource.nextCGFloat(in: spawnPadding...(worldSize - spawnPadding)),
+                y: randomSource.nextCGFloat(in: spawnPadding...(worldSize - spawnPadding))
             )
 
-            if blocked.contains(where: { $0.distance(to: point) < padding }) {
+            let isTooCloseToBlocked = blocked.contains { $0.distance(to: candidate) < spawnPadding }
+            if isTooCloseToBlocked {
                 continue
             }
 
-            if obstacles.contains(where: { $0.center.distance(to: point) < radius * 2.4 }) {
+            let minObstacleDistance = obstacleRadius * Constants.obstacleSpacingMultiplier
+            let isTooCloseToObstacle = obstacles.contains { $0.center.distance(to: candidate) < minObstacleDistance }
+            if isTooCloseToObstacle {
                 continue
             }
 
-            obstacles.append(Obstacle(center: point, radius: radius))
+            obstacles.append(Obstacle(center: candidate, radius: obstacleRadius))
         }
 
         return obstacles

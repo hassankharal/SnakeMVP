@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Binding var themeId: String
     @Binding var hapticsOn: Bool
+    @Binding var adsRemoved: Bool
 
     var body: some View {
         NavigationStack {
@@ -18,6 +19,10 @@ struct SettingsView: View {
 
                 Section(header: Text("Feedback")) {
                     Toggle("Haptics", isOn: $hapticsOn)
+                }
+
+                Section(header: Text("Paid")) {
+                    Toggle("Remove Ads (Paid)", isOn: $adsRemoved)
                 }
 
                 Section(footer: Text("More options like sound, difficulty, and control sensitivity can be added next.")) {

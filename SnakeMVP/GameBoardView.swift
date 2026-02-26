@@ -6,83 +6,138 @@ struct GameBoardView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let size = min(proxy.size.width, proxy.size.height)
+            let boardSize = min(proxy.size.width, proxy.size.height)
             let boardRect = CGRect(
-                x: (proxy.size.width - size) / 2,
-                y: (proxy.size.height - size) / 2,
-                width: size,
-                height: size
+                x: (proxy.size.width - boardSize) / 2,
+                y: (proxy.size.height - boardSize) / 2,
+                width: boardSize,
+                height: boardSize
             )
 
             Canvas { context, _ in
                 let palette = theme.palette
-                let world = model.level.worldSize
-                let scale = size / world
+                let scale = boardSize / model.level.worldSize
 
-                let boardPath = RoundedRectangle(cornerRadius: 28).path(in: boardRect)
-                context.fill(boardPath, with: .color(palette.board))
-                context.stroke(boardPath, with: .color(palette.boardOutline), lineWidth: 1)
-
-                // Obstacles
-                for obstacle in model.obstacles {
-                    let rect = CGRect(
-                        x: boardRect.minX + obstacle.center.x * scale - obstacle.radius * scale,
-                        y: boardRect.minY + obstacle.center.y * scale - obstacle.radius * scale,
-                        width: obstacle.radius * 2 * scale,
-                        height: obstacle.radius * 2 * scale
-                    )
-                    context.fill(Path(ellipseIn: rect), with: .color(palette.obstacle))
-                }
-
-                // Food
-                let foodRect = CGRect(
-                    x: boardRect.minX + model.food.x * scale - model.foodRadius * scale,
-                    y: boardRect.minY + model.food.y * scale - model.foodRadius * scale,
-                    width: model.foodRadius * 2 * scale,
-                    height: model.foodRadius * 2 * scale
-                )
-                context.drawLayer { layer in
-                    layer.addFilter(.shadow(color: palette.food.opacity(0.75), radius: model.foodRadius * scale * 0.8, x: 0, y: 0))
-                    layer.fill(Path(ellipseIn: foodRect), with: .color(palette.food))
-                }
-
-                // Snake body
-                if model.snakePath.count > 1 {
-                    var path = Path()
-                    let start = model.snakePath[0]
-                    path.move(to: CGPoint(x: boardRect.minX + start.x * scale, y: boardRect.minY + start.y * scale))
-                    for point in model.snakePath.dropFirst() {
-                        path.addLine(to: CGPoint(x: boardRect.minX + point.x * scale, y: boardRect.minY + point.y * scale))
-                    }
-                    context.stroke(
-                        path,
-                        with: .color(palette.snakeBody),
-                        style: StrokeStyle(lineWidth: model.bodyRadius * 2 * scale, lineCap: .round, lineJoin: .round)
-                    )
-                }
-
-                // Snake head
-                if let head = model.snakePath.first {
-                    let headRect = CGRect(
-                        x: boardRect.minX + head.x * scale - model.headRadius * scale,
-                        y: boardRect.minY + head.y * scale - model.headRadius * scale,
-                        width: model.headRadius * 2 * scale,
-                        height: model.headRadius * 2 * scale
-                    )
-                    context.fill(Path(ellipseIn: headRect), with: .color(palette.snakeHead))
-
-                    let highlight = CGRect(
-                        x: headRect.midX - model.headRadius * 0.3 * scale,
-                        y: headRect.midY - model.headRadius * 0.3 * scale,
-                        width: model.headRadius * 0.6 * scale,
-                        height: model.headRadius * 0.6 * scale
-                    )
-                    context.fill(Path(ellipseIn: highlight), with: .color(Color.white.opacity(0.65)))
-                }
+                drawBoardBase(in: boardRect, palette: palette, context: &context)
+                drawObstacles(in: boardRect, scale: scale, palette: palette, context: &context)
+                drawFood(in: boardRect, scale: scale, palette: palette, context: &context)
+                drawSnake(in: boardRect, scale: scale, palette: palette, context: &context)
             }
-            .frame(width: size, height: size)
+            .frame(width: boardSize, height: boardSize)
         }
         .padding(.horizontal, 8)
         .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func drawBoardBase(in rect: CGRect, palette: ThemePalette, context: inout GraphicsContext) {
+        let boardPath = RoundedRectangle(cornerRadius: 28).path(in: rect)
+        context.fill(boardPath, with: .color(palette.board))
+        context.stroke(boardPath, with: .color(palette.boardOutline), lineWidth: 1)
+    }
+
+    private func drawObstacles(
+        in boardRect: CGRect,
+        scale: CGFloat,
+        palette: ThemePalette,
+        context: inout GraphicsContext
+    ) {
+        for obstacle in model.obstacles {
+            let radius = obstacle.radius * scale
+            let center = boardPoint(for: obstacle.center, boardRect: boardRect, scale: scale)
+            let rect = CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+            context.fill(Path(ellipseIn: rect), with: .color(palette.obstacle))
+        }
+    }
+
+    private func drawFood(
+        in boardRect: CGRect,
+        scale: CGFloat,
+        palette: ThemePalette,
+        context: inout GraphicsContext
+    ) {
+        let radius = model.foodRadius * scale
+        let center = boardPoint(for: model.food, boardRect: boardRect, scale: scale)
+        let rect = CGRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        )
+
+        context.drawLayer { layer in
+            layer.addFilter(.shadow(color: palette.food.opacity(0.75), radius: radius * 0.8, x: 0, y: 0))
+            layer.fill(Path(ellipseIn: rect), with: .color(palette.food))
+        }
+    }
+
+    private func drawSnake(
+        in boardRect: CGRect,
+        scale: CGFloat,
+        palette: ThemePalette,
+        context: inout GraphicsContext
+    ) {
+        guard let head = model.snakePath.first else { return }
+
+        if model.snakePath.count > 1 {
+            var bodyPath = Path()
+            bodyPath.move(to: boardPoint(for: head, boardRect: boardRect, scale: scale))
+
+            for point in model.snakePath.dropFirst() {
+                bodyPath.addLine(to: boardPoint(for: point, boardRect: boardRect, scale: scale))
+            }
+
+            context.stroke(
+                bodyPath,
+                with: .color(palette.snakeBody),
+                style: StrokeStyle(
+                    lineWidth: model.bodyRadius * 2 * scale,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
+
+        drawSnakeHead(at: head, in: boardRect, scale: scale, palette: palette, context: &context)
+    }
+
+    private func drawSnakeHead(
+        at worldHead: CGPoint,
+        in boardRect: CGRect,
+        scale: CGFloat,
+        palette: ThemePalette,
+        context: inout GraphicsContext
+    ) {
+        let radius = model.headRadius * scale
+        let headCenter = boardPoint(for: worldHead, boardRect: boardRect, scale: scale)
+
+        let headRect = CGRect(
+            x: headCenter.x - radius,
+            y: headCenter.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        )
+
+        context.fill(Path(ellipseIn: headRect), with: .color(palette.snakeHead))
+
+        let highlightRect = CGRect(
+            x: headRect.midX - radius * 0.3,
+            y: headRect.midY - radius * 0.3,
+            width: radius * 0.6,
+            height: radius * 0.6
+        )
+
+        context.fill(Path(ellipseIn: highlightRect), with: .color(Color.white.opacity(0.65)))
+    }
+
+    private func boardPoint(for worldPoint: CGPoint, boardRect: CGRect, scale: CGFloat) -> CGPoint {
+        CGPoint(
+            x: boardRect.minX + worldPoint.x * scale,
+            y: boardRect.minY + worldPoint.y * scale
+        )
     }
 }
