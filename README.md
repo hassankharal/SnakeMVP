@@ -28,29 +28,54 @@ Snake MVP is a mobile-first iOS Snake game built with SwiftUI. The snake is cont
 - `SnakeMVP/Monetization.swift`: Ad visibility policy helper
 - `SnakeMVP/AppSettings.swift`: Centralized AppStorage keys/defaults
 
-## Build And Run
-1. Open `/Users/hassankharal/Documents/Dev/Snake/SnakeMVP.xcodeproj` in Xcode.
-2. Select simulator `iPhone 17` (or another available simulator).
-3. Run the `SnakeMVP` scheme.
+## Prerequisites
+- macOS with Xcode installed
+- iOS Simulator runtime installed from Xcode
 
-CLI build command:
+## Build And Run (Any Workstation)
+1. From the repository root, list available simulator destinations:
 
 ```bash
-xcodebuild -project /Users/hassankharal/Documents/Dev/Snake/SnakeMVP.xcodeproj \
+xcodebuild -showdestinations -project SnakeMVP.xcodeproj -scheme SnakeMVP
+```
+
+2. Pick an available simulator (for example `iPhone 16`) and build:
+
+```bash
+SIMULATOR_NAME="iPhone 16" # replace with one from showdestinations
+
+xcodebuild -project SnakeMVP.xcodeproj \
   -scheme SnakeMVP \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
   build
 ```
 
-## Run Tests
+3. Run in Xcode if preferred:
+- `open SnakeMVP.xcodeproj`
+- Select any installed iOS simulator
+- Run scheme `SnakeMVP`
+
+## Run Tests (Any Workstation)
 ```bash
-xcodebuild test -project /Users/hassankharal/Documents/Dev/Snake/SnakeMVP.xcodeproj \
+SIMULATOR_NAME="iPhone 16" # replace with one from showdestinations
+
+xcodebuild test -project SnakeMVP.xcodeproj \
   -scheme SnakeMVP \
-  -destination 'platform=iOS Simulator,name=iPhone 17'
+  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}"
 ```
 
 Test target: `SnakeMVPTests`
+
+## Quick Smoke Test Checklist
+1. Launch app to Home screen.
+2. Start game and verify joystick movement.
+3. Pause and resume from overlay.
+4. Trigger game over and restart.
+5. Complete a level and continue.
+6. Open settings and change theme.
+7. Toggle haptics and verify feedback.
+8. Toggle paid mode and confirm ad placeholders hide/show.
 
 ## Monetization Placeholder Behavior
 - `adsRemoved = false`: top and bottom ad placeholder banners are shown.
@@ -64,5 +89,5 @@ Test target: `SnakeMVPTests`
 - Gameplay tests cover logic, not snapshot/UI pixel tests
 
 ## Handoff Docs
-- `/Users/hassankharal/Documents/Dev/Snake/DEVELOPMENT.md`
-- `/Users/hassankharal/Documents/Dev/Snake/STATE_OF_APP.md`
+- `DEVELOPMENT.md`
+- `STATE_OF_APP.md`

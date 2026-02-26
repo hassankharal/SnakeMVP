@@ -46,17 +46,27 @@
 
 ### Commands
 ```bash
-xcodebuild -project /Users/hassankharal/Documents/Dev/Snake/SnakeMVP.xcodeproj \
+SIMULATOR_NAME="iPhone 16" # replace with an installed simulator
+
+xcodebuild -project SnakeMVP.xcodeproj \
   -scheme SnakeMVP \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
   build
 ```
 
 ```bash
-xcodebuild test -project /Users/hassankharal/Documents/Dev/Snake/SnakeMVP.xcodeproj \
+SIMULATOR_NAME="iPhone 16" # replace with an installed simulator
+
+xcodebuild test -project SnakeMVP.xcodeproj \
   -scheme SnakeMVP \
-  -destination 'platform=iOS Simulator,name=iPhone 17'
+  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}"
+```
+
+If you need to discover valid destinations on a new machine:
+
+```bash
+xcodebuild -showdestinations -project SnakeMVP.xcodeproj -scheme SnakeMVP
 ```
 
 ## Extension Points
